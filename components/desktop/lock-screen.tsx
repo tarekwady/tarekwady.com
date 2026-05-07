@@ -86,8 +86,8 @@ export function LockScreen({ onUnlock }: LockScreenProps) {
         {/* Avatar with shadow */}
         <div className="w-16 h-16 rounded-full overflow-hidden shadow-xl">
           <Image
-            src="/headshot.jpg"
-            alt="Alana Goyal"
+            src="/headshot.png"
+            alt="Tarek Wady"
             width={64}
             height={64}
             className="object-cover w-full h-full"
@@ -96,7 +96,7 @@ export function LockScreen({ onUnlock }: LockScreenProps) {
 
         {/* Name */}
         <div className="mt-2 text-sm font-medium text-white drop-shadow-md">
-          Alana Goyal
+          Tarek Wady
         </div>
 
         {/* Touch ID prompt */}
