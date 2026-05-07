@@ -282,7 +282,7 @@ export async function POST(req: NextRequest) {
 
     const response = await createChatCompletionWithTimeout(
       {
-        model: "gpt-5.2",
+        model: "claude-haiku-4-5-20251001",
         messages: chatMessages,
         tool_choice: "required",
         tools,
