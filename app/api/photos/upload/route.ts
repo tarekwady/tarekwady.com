@@ -83,18 +83,21 @@ function normalizeCollections(value: unknown): string[] | null {
   return normalized;
 }
 
-// Use OpenAI Vision to categorize the image
+// Use Claude Vision (via Braintrust proxy) to categorize the image
 async function categorizeImage(base64Image: string): Promise<string[]> {
-  if (!process.env.OPENAI_API_KEY) {
-    console.warn("OPENAI_API_KEY not set, skipping categorization");
+  if (!process.env.BRAINTRUST_API_KEY) {
+    console.warn("BRAINTRUST_API_KEY not set, skipping categorization");
     return [];
   }
 
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const openai = new OpenAI({
+    baseURL: "https://api.braintrust.dev/v1/proxy",
+    apiKey: process.env.BRAINTRUST_API_KEY,
+  });
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "claude-haiku-4-5-20251001",
       messages: [
         {
           role: "user",
