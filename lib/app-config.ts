@@ -57,6 +57,14 @@ export const APPS: AppConfig[] = [
     defaultSize: { width: 900, height: 650 },
     minSize: { width: 600, height: 450 },
     menuBarTitle: "Music",
+    showOnDockByDefault: false,
+    showInFinderApplications: false,
+    mobile: {
+      supported: false,
+      shellFallbackAppId: "notes",
+      directRouteRedirectTo: "/",
+      showInFinderApplications: false,
+    },
   },
   {
     id: "calendar",
