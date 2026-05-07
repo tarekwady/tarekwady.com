@@ -187,7 +187,7 @@ export function WifiMenu({ isOpen, onClose, onOpenWifiSettings }: WifiMenuProps)
             <div className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-500">
               <Wifi className="w-3 h-3 text-white" />
             </div>
-            <span className="text-xs flex-1">basecase</span>
+            <span className="text-xs flex-1">tarekwady</span>
             <Lock className="w-3 h-3 text-muted-foreground can-hover:group-hover:text-white/70" />
           </div>
 
@@ -301,7 +301,7 @@ export function ControlCenterMenu({ isOpen, onClose }: ControlCenterMenuProps) {
             <div className="text-left min-w-0">
               <div className="text-xs font-medium truncate">Wi-Fi</div>
               <div className="text-[10px] truncate text-muted-foreground">
-                {wifiEnabled ? "basecase" : "Off"}
+                {wifiEnabled ? "tarekwady" : "Off"}
               </div>
             </div>
           </button>

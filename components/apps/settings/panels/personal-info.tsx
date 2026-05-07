@@ -97,7 +97,7 @@ export function PersonalInfoPanel() {
           </a>
           <div className="flex items-center justify-between px-4 py-3">
             <span className="text-xs">Birthday</span>
-            <span className="text-xs text-muted-foreground">1/12/1996</span>
+            <span className="text-xs text-muted-foreground">28/07/2006</span>
           </div>
         </div>
       </div>

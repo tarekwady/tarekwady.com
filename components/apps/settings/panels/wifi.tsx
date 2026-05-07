@@ -12,7 +12,7 @@ function WifiSignal({ className }: { className?: string }) {
 }
 
 const knownNetworks = [
-  { name: "basecase", connected: true },
+  { name: "tarekwady", connected: true },
 ];
 
 const personalHotspots = [
@@ -71,7 +71,7 @@ export function WifiPanel({}: WifiPanelProps) {
           <div className="py-4 border-b border-border/50">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="text-xs font-medium">basecase</span>
+                <span className="text-xs font-medium">tarekwady</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="flex items-center gap-1 text-xs text-green-600">

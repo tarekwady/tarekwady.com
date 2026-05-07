@@ -41,24 +41,6 @@ const LOCAL_SAMPLE_FILES: LocalSampleFile[] = [
     kind: "text",
     path: `${HOME_DIR}/Documents/hello.md`,
   },
-  {
-    assetUrl: "/documents/Base%20Case%20Capital%20I%20-%20Form%20D.pdf",
-    directoryPath: `${HOME_DIR}/Desktop`,
-    kind: "preview",
-    path: `${HOME_DIR}/Desktop/Base Case Capital I - Form D.pdf`,
-  },
-  {
-    assetUrl: "/documents/Base%20Case%20Capital%20II%20-%20Form%20D.pdf",
-    directoryPath: `${HOME_DIR}/Desktop`,
-    kind: "preview",
-    path: `${HOME_DIR}/Desktop/Base Case Capital II - Form D.pdf`,
-  },
-  {
-    assetUrl: "/documents/Base%20Case%20Capital%20III%20-%20Form%20D.pdf",
-    directoryPath: `${HOME_DIR}/Desktop`,
-    kind: "preview",
-    path: `${HOME_DIR}/Desktop/Base Case Capital III - Form D.pdf`,
-  },
 ];
 
 const LOCAL_SAMPLE_FILE_MAP = Object.fromEntries(
