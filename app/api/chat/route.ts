@@ -272,6 +272,7 @@ export async function POST(req: NextRequest) {
 
     const chatMessages: ChatCompletionMessageParam[] = [
       { role: "system", content: prompt },
+      { role: "user", content: "Pick the best action(s) for this turn." },
     ];
 
     // Define tools based on chat type
