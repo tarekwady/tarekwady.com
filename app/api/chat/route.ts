@@ -1,9 +1,6 @@
 import { OpenAI } from "openai";
-import type {
-  FunctionTool,
-  ResponseCreateParamsNonStreaming,
-  ResponseFunctionToolCall,
-} from "openai/resources/responses/responses";
+import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
+import type { ChatCompletionMessageToolCall } from "openai/resources/chat/completions";
 import { NextRequest, NextResponse } from "next/server";
 import { Recipient, Message } from "@/types/messages";
 import { initialContacts } from "@/data/messages/initial-contacts";
@@ -98,8 +95,14 @@ function isTransientUpstreamError(error: unknown): boolean {
   );
 }
 
-async function createResponseWithTimeout(
-  params: ResponseCreateParamsNonStreaming,
+function hasChoices(
+  value: unknown
+): value is { choices: Array<{ message?: { tool_calls?: ChatCompletionMessageToolCall[] } }> } {
+  return typeof value === "object" && value !== null && "choices" in value;
+}
+
+async function createChatCompletionWithTimeout(
+  params: Parameters<OpenAI["chat"]["completions"]["create"]>[0],
   timeoutMs: number
 ) {
   const controller = new AbortController();
@@ -107,7 +110,7 @@ async function createResponseWithTimeout(
     controller.abort(`chat upstream timeout after ${timeoutMs}ms`);
   }, timeoutMs);
   try {
-    return await getClient().responses.create(params, {
+    return await getClient().chat.completions.create(params, {
       signal: controller.signal,
     });
   } finally {
@@ -267,48 +270,50 @@ export async function POST(req: NextRequest) {
           state
         );
 
+    const chatMessages: ChatCompletionMessageParam[] = [
+      { role: "system", content: prompt },
+    ];
+
     // Define tools based on chat type
     const participantNames = recipients.map((r) => r.name);
     const tools = isOneOnOne
       ? buildOneOnOneTools(recipients[0].name)
       : buildGroupTools(participantNames, state.lastSpeaker);
 
-    const response = await createResponseWithTimeout(
+    const response = await createChatCompletionWithTimeout(
       {
         model: "claude-haiku-4-5-20251001",
-        instructions: prompt,
-        input: [
-          {
-            role: "user",
-            content: "Pick the best action(s) for this turn.",
-          },
-        ],
+        messages: chatMessages,
         tool_choice: "required",
         tools,
+        stream: false,
         parallel_tool_calls: false,
         temperature: 0.7,
-        max_output_tokens: 300,
+        max_tokens: 300,
       },
       CHAT_REQUEST_TIMEOUT_MS
     );
+    if (!hasChoices(response)) {
+      throw new Error("Unexpected streaming response from chat completions API");
+    }
 
-    const functionCalls = (response.output ?? []).filter(
-      (item): item is ResponseFunctionToolCall => item.type === "function_call"
-    );
-
-    if (functionCalls.length === 0) {
+    const toolCalls = response.choices[0]?.message?.tool_calls;
+    if (!toolCalls || toolCalls.length === 0) {
       console.error(
-        "No function calls in response. Output:",
-        JSON.stringify(response.output, null, 2)
+        "No tool calls in response. Message:",
+        JSON.stringify(response.choices[0]?.message, null, 2)
       );
       return jsonResponse({ actions: [{ action: "wait" }] });
     }
 
     // Return all actions (supports react + respond in same turn)
-    const actions = functionCalls.map((call) => {
-      const args = parseToolCallArguments(call.arguments, call.name);
+    const actions = toolCalls.map((tc: ChatCompletionMessageToolCall) => {
+      const args = parseToolCallArguments(
+        tc.function.arguments,
+        tc.function.name
+      );
       return {
-        action: call.name,
+        action: tc.function.name,
         ...args,
       };
     });
@@ -431,64 +436,63 @@ Pick the best action(s).`;
  * (user sends message, AI responds). No wait/wrap_up needed since the AI
  * should always respond when the user messages them directly.
  */
-function buildOneOnOneTools(recipientName: string): FunctionTool[] {
+function buildOneOnOneTools(recipientName: string) {
   return [
     {
-      type: "function",
-      name: "react",
-      description: "React to the last message WITHOUT saying anything. Use this when you want to ONLY react (no text reply).",
-      strict: false,
-      parameters: {
-        type: "object",
-        properties: {
-          participant: {
-            type: "string",
-            enum: [recipientName],
+      type: "function" as const,
+      function: {
+        name: "react",
+        description: "React to the last message WITHOUT saying anything. Use this when you want to ONLY react (no text reply).",
+        parameters: {
+          type: "object",
+          properties: {
+            participant: {
+              type: "string",
+              enum: [recipientName],
+            },
+            reaction: {
+              type: "string",
+              enum: ["heart", "like", "dislike", "laugh", "emphasize", "question"],
+              description: "'laugh' for funny, 'heart' for touching, 'like' for agree, 'emphasize' for important",
+            },
           },
-          reaction: {
-            type: "string",
-            enum: ["heart", "like", "dislike", "laugh", "emphasize", "question"],
-            description: "'laugh' for funny, 'heart' for touching, 'like' for agree, 'emphasize' for important",
-          },
+          required: ["participant", "reaction"],
         },
-        required: ["participant", "reaction"],
       },
     },
     {
-      type: "function",
-      name: "respond",
-      description: "Send text messages. Optionally react to the last message at the same time.",
-      strict: false,
-      parameters: {
-        type: "object",
-        properties: {
-          participant: {
-            type: "string",
-            enum: [recipientName],
+      type: "function" as const,
+      function: {
+        name: "respond",
+        description: "Send text messages. Optionally react to the last message at the same time.",
+        parameters: {
+          type: "object",
+          properties: {
+            participant: {
+              type: "string",
+              enum: [recipientName],
+            },
+            messages: {
+              type: "array",
+              items: { type: "string" },
+              minItems: 1,
+              maxItems: 3,
+              description: "1-3 short texts, like real iMessage. Each should be 1 sentence. Split separate thoughts into separate messages.",
+            },
+            reaction: {
+              type: "string",
+              enum: ["heart", "like", "dislike", "laugh", "emphasize", "question"],
+              description: "Optional: also react to the last message before responding. Use when something genuinely warrants it.",
+            },
           },
-          messages: {
-            type: "array",
-            items: { type: "string" },
-            minItems: 1,
-            maxItems: 3,
-            description: "1-3 short texts, like real iMessage. Each should be 1 sentence. Split separate thoughts into separate messages.",
-          },
-          reaction: {
-            type: "string",
-            enum: ["heart", "like", "dislike", "laugh", "emphasize", "question"],
-            description: "Optional: also react to the last message before responding. Use when something genuinely warrants it.",
-          },
+          required: ["participant", "messages"],
         },
-        required: ["participant", "messages"],
       },
     },
   ];
 }
 
-function buildGroupTools(
-  participantNames: string[],
-  lastSpeaker: string | null
-): FunctionTool[] {
+function buildGroupTools(participantNames: string[], lastSpeaker: string | null) {
   // Filter out the last speaker from eligible participants (they shouldn't speak twice in a row)
   const eligibleSpeakers = lastSpeaker && lastSpeaker !== "me"
     ? participantNames.filter(name => name !== lastSpeaker)
@@ -501,81 +505,85 @@ function buildGroupTools(
 
   return [
     {
-      type: "function",
-      name: "react",
-      description: "Add an emoji reaction to the last message. React sparingly — only when genuinely warranted.",
-      strict: false,
-      parameters: {
-        type: "object",
-        properties: {
-          participant: {
-            type: "string",
-            enum: eligibleReactors.length > 0 ? eligibleReactors : participantNames,
+      type: "function" as const,
+      function: {
+        name: "react",
+        description: "Add an emoji reaction to the last message. React sparingly — only when genuinely warranted.",
+        parameters: {
+          type: "object",
+          properties: {
+            participant: {
+              type: "string",
+              enum: eligibleReactors.length > 0 ? eligibleReactors : participantNames,
+            },
+            reaction: {
+              type: "string",
+              enum: ["heart", "like", "dislike", "laugh", "emphasize", "question"],
+            },
           },
-          reaction: {
-            type: "string",
-            enum: ["heart", "like", "dislike", "laugh", "emphasize", "question"],
-          },
+          required: ["participant", "reaction"],
         },
-        required: ["participant", "reaction"],
       },
     },
     {
-      type: "function",
-      name: "respond",
-      description: "Send short text messages like real iMessage. Optionally react to the last message at the same time.",
-      strict: false,
-      parameters: {
-        type: "object",
-        properties: {
-          participant: {
-            type: "string",
-            enum: eligibleSpeakers.length > 0 ? eligibleSpeakers : participantNames,
+      type: "function" as const,
+      function: {
+        name: "respond",
+        description: "Send short text messages like real iMessage. Optionally react to the last message at the same time.",
+        parameters: {
+          type: "object",
+          properties: {
+            participant: {
+              type: "string",
+              enum: eligibleSpeakers.length > 0 ? eligibleSpeakers : participantNames,
+            },
+            messages: {
+              type: "array",
+              items: { type: "string" },
+              minItems: 1,
+              maxItems: 3,
+              description: "1-3 short texts. Each should be 1 sentence. Split separate thoughts into separate messages instead of one long block.",
+            },
+            reaction: {
+              type: "string",
+              enum: ["heart", "like", "dislike", "laugh", "emphasize", "question"],
+              description: "Optional: also react to the last message before responding. Use when something genuinely warrants it.",
+            },
           },
-          messages: {
-            type: "array",
-            items: { type: "string" },
-            minItems: 1,
-            maxItems: 3,
-            description: "1-3 short texts. Each should be 1 sentence. Split separate thoughts into separate messages instead of one long block.",
-          },
-          reaction: {
-            type: "string",
-            enum: ["heart", "like", "dislike", "laugh", "emphasize", "question"],
-            description: "Optional: also react to the last message before responding. Use when something genuinely warrants it.",
-          },
+          required: ["participant", "messages"],
         },
-        required: ["participant", "messages"],
       },
     },
     {
-      type: "function",
-      name: "wait",
-      description: "Stay silent. ONLY use this when anon (the human) specifically needs to respond — e.g. a question was directed at them. Do NOT wait if another participant asked an AI participant a question.",
-      strict: false,
-      parameters: {
-        type: "object",
-        properties: {},
+      type: "function" as const,
+      function: {
+        name: "wait",
+        description: "Stay silent. ONLY use this when anon (the human) specifically needs to respond — e.g. a question was directed at them. Do NOT wait if another participant asked an AI participant a question.",
+        parameters: {
+          type: "object",
+          properties: {},
+        },
       },
     },
     {
-      type: "function",
-      name: "wrap_up",
-      description: "End conversation with a brief friendly closing (1 sentence).",
-      strict: false,
-      parameters: {
-        type: "object",
-        properties: {
-          participant: {
-            type: "string",
-            enum: eligibleSpeakers.length > 0 ? eligibleSpeakers : participantNames,
+      type: "function" as const,
+      function: {
+        name: "wrap_up",
+        description: "End conversation with a brief friendly closing (1 sentence).",
+        parameters: {
+          type: "object",
+          properties: {
+            participant: {
+              type: "string",
+              enum: eligibleSpeakers.length > 0 ? eligibleSpeakers : participantNames,
+            },
+            message: {
+              type: "string",
+              description: "Brief, natural sign-off. 1 sentence.",
+            },
           },
-          message: {
-            type: "string",
-            description: "Brief, natural sign-off. 1 sentence.",
-          },
+          required: ["participant", "message"],
         },
-        required: ["participant", "message"],
       },
     },
   ];
