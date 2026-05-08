@@ -277,7 +277,12 @@ export async function POST(req: NextRequest) {
       {
         model: "claude-haiku-4-5-20251001",
         instructions: prompt,
-        input: "Pick the best action(s) for this turn.",
+        input: [
+          {
+            role: "user",
+            content: "Pick the best action(s) for this turn.",
+          },
+        ],
         tool_choice: "required",
         tools,
         parallel_tool_calls: false,
