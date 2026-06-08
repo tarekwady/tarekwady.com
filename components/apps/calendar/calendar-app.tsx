@@ -190,7 +190,7 @@ export function CalendarApp({ isMobile = false, inShell = false }: CalendarAppPr
     setCurrentDate(savedDate);
     setTimeGridScrollTop(scrollTop);
 
-    // Load user events and calendars (sample events are generated on-demand)
+    // Load user events and calendars (holidays are generated on-demand)
     setEvents(loadUserEvents());
     setCalendars(loadCalendars());
     setIsLoaded(true);
@@ -284,7 +284,7 @@ export function CalendarApp({ isMobile = false, inShell = false }: CalendarAppPr
     // Only delete if it's a user event (exists in our events state)
     setEvents((prev) => {
       const eventExists = prev.some((e) => e.id === eventId);
-      if (!eventExists) return prev; // Can't delete sample/holiday events
+      if (!eventExists) return prev; // Can't delete holiday events
       const updated = prev.filter((e) => e.id !== eventId);
       saveUserEvents(updated);
       return updated;
